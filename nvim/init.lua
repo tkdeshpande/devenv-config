@@ -6,6 +6,7 @@ vim.opt.expandtab = true -- spaces, not tabs
 vim.opt.wrap = false
 vim.opt.termguicolors = true
 vim.cmd.colorscheme("wildcharm")
+vim.opt.clipboard = "unnamedplus"
 
 local lazypath = vim.fn.stdpath("data") .. "/lazy/lazy.nvim"
 if not vim.loop.fs_stat(lazypath) then
