@@ -1,0 +1,55 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# ── Helpers ───────────────────────────────────────────────────────────────────
+log() { echo "[INFO]  $*"; }
+err() { echo "[ERROR] $*" >&2; }
+
+# ── Preflight checks ──────────────────────────────────────────────────────────
+for cmd in curl jq tar; do
+  command -v "$cmd" &>/dev/null || { err "Required tool not found: $cmd"; exit 1; } done
+
+# ── Check if tmux is already installed ───────────────────────────────────────
+if command -v tmux &>/dev/null; then
+  log "tmux is already installed ($(tmux -V)), skipping installation."
+  exit 0
+fi
+
+# ── Config ────────────────────────────────────────────────────────────────────
+install_dir="/usr/local/bin"
+
+# ── Detect platform ───────────────────────────────────────────────────────────
+platform=$(uname -s | tr '[:upper:]' '[:lower:]')
+log "Detected platform: $platform"
+
+# ── Fetch latest version ──────────────────────────────────────────────────────
+log "Fetching latest tmux version..."
+version=$(curl -sf "https://api.github.com/repos/tmux/tmux/releases/latest" \
+  | jq -r '.tag_name') || { err "Failed to fetch version from GitHub API"; exit 1; }
+log "Latest version: $version"
+
+filename="tmux-${version}-${platform}.tar.gz"
+
+# ── Download & extract in a temp dir ─────────────────────────────────────────
+tmp_dir=$(mktemp -d)
+trap 'rm -rf "$tmp_dir"' EXIT
+
+log "Downloading $filename..."
+curl -fL "https://github.com/tmux/tmux/releases/latest/download/$filename" \
+  -o "$tmp_dir/tmux.tar.gz"
+
+log "Extracting archive..."
+tar -xzf "$tmp_dir/tmux.tar.gz" -C "$tmp_dir"
+
+# ── Install binary ────────────────────────────────────────────────────────────
+log "Installing tmux to $install_dir..."
+mv "$tmp_dir/tmux" "$install_dir/tmux"
+chmod +x "$install_dir/tmux"
+
+# ── Install config ────────────────────────────────────────────────────────────
+log "Setting up tmux config..."
+cp config/.tmux.conf "$HOME"
+tmux source "$HOME/.tmux.conf"
+
+log "Done! tmux $version installed successfully.
+"
