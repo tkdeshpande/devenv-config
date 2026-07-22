@@ -1,0 +1,14 @@
+services:
+  dev:
+    build: .
+    image: my-ubuntu-app
+    container_name: my-dev-container
+    stdin_open: true   # the -i flag
+    tty: true           # the -t flag
+    working_dir: /workspace
+    volumes:
+      - ~/.config/nvim:/root/.config/nvim 
+      - ~/.tmux.conf:/root/.tmux.conf 
+      - ~/.claude:/root/.claude
+      - ~/.claude.json:/root/.claude.json
+      - .:/workspace
