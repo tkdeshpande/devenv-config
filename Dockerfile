@@ -5,8 +5,11 @@ WORKDIR /app
 COPY . .
 
 RUN apt-get update && \
-  apt-get install -y git curl neovim tmux build-essential nodejs npm ca-certificates && \
+  apt-get install -y git curl neovim tmux build-essential nodejs npm ca-certificates unzip python3-pip python3-venv wget ripgrep && \
   rm -rf /var/lib/apt/lists/*
+
+ENV LANG=C.UTF-8
+ENV LC_ALL=C.UTF-8
 
 # Install Go (latest stable, arch-detected)
 RUN ARCH=$(dpkg --print-architecture) && \

@@ -147,4 +147,145 @@ require("lazy").setup({
 			})
 		end,
 	},
+
+	-- Debug Adapter Protocol (DAP): JS/TS, Python, C++, Rust, Go, Shell
+	{
+		"mfussenegger/nvim-dap",
+		dependencies = {
+			{ "rcarriga/nvim-dap-ui", dependencies = { "nvim-neotest/nvim-nio" } },
+			"theHamsta/nvim-dap-virtual-text",
+			{ "jay-babu/mason-nvim-dap.nvim", dependencies = { "williamboman/mason.nvim" } },
+			"mfussenegger/nvim-dap-python",
+			"leoluz/nvim-dap-go",
+		},
+		config = function()
+			local dap = require("dap")
+			local dapui = require("dapui")
+			local mason_root = vim.fn.stdpath("data") .. "/mason/packages"
+
+			-- Mason: only used to install the debug adapter binaries below.
+			-- Adapters/configurations are wired up manually for predictable paths.
+			require("mason-nvim-dap").setup({
+				ensure_installed = { "python", "delve", "codelldb", "bash", "js" },
+				automatic_installation = true,
+			})
+
+			-- Python (debugpy)
+			require("dap-python").setup(mason_root .. "/debugpy/venv/bin/python")
+
+			-- Go (delve) - mason puts dlv on PATH automatically
+			require("dap-go").setup()
+
+			-- C, C++, Rust (codelldb)
+			local codelldb_root = mason_root .. "/codelldb/extension"
+			dap.adapters.codelldb = {
+				type = "server",
+				port = "${port}",
+				executable = {
+					command = codelldb_root .. "/adapter/codelldb",
+					args = { "--port", "${port}" },
+				},
+			}
+			for _, lang in ipairs({ "c", "cpp", "rust" }) do
+				dap.configurations[lang] = {
+					{
+						name = "Launch",
+						type = "codelldb",
+						request = "launch",
+						program = function()
+							return vim.fn.input("Path to executable: ", vim.fn.getcwd() .. "/", "file")
+						end,
+						cwd = "${workspaceFolder}",
+						stopOnEntry = false,
+					},
+				}
+			end
+
+			-- Shell scripts (bashdb via bash-debug-adapter)
+			local bashdb_root = mason_root .. "/bash-debug-adapter"
+			dap.adapters.bashdb = {
+				type = "executable",
+				command = bashdb_root .. "/bash-debug-adapter",
+				name = "bashdb",
+			}
+			dap.configurations.sh = {
+				{
+					type = "bashdb",
+					request = "launch",
+					name = "Launch file",
+					showDebugOutput = true,
+					pathBashdb = bashdb_root .. "/extension/bashdb_dir/bashdb",
+					pathBashdbLib = bashdb_root .. "/extension/bashdb_dir",
+					trace = true,
+					file = "${file}",
+					program = "${file}",
+					cwd = "${workspaceFolder}",
+					pathCat = "cat",
+					pathBash = "/bin/bash",
+					pathMkfifo = "mkfifo",
+					pathPkill = "pkill",
+					args = {},
+					env = {},
+					terminalKind = "integrated",
+				},
+			}
+
+			-- JavaScript / TypeScript (js-debug-adapter, installed by Mason - no manual build needed)
+			dap.adapters["pwa-node"] = {
+				type = "server",
+				host = "localhost",
+				port = "${port}",
+				executable = {
+					command = "node",
+					args = { mason_root .. "/js-debug-adapter/js-debug/src/dapDebugServer.js", "${port}" },
+				},
+			}
+			for _, lang in ipairs({ "javascript", "typescript", "javascriptreact", "typescriptreact" }) do
+				dap.configurations[lang] = {
+					{
+						type = "pwa-node",
+						request = "launch",
+						name = "Launch file",
+						program = "${file}",
+						cwd = "${workspaceFolder}",
+					},
+					{
+						type = "pwa-node",
+						request = "attach",
+						name = "Attach",
+						processId = require("dap.utils").pick_process,
+						cwd = "${workspaceFolder}",
+					},
+				}
+			end
+
+			-- UI
+			dapui.setup()
+			require("nvim-dap-virtual-text").setup()
+			dap.listeners.before.attach.dapui_config = function()
+				dapui.open()
+			end
+			dap.listeners.before.launch.dapui_config = function()
+				dapui.open()
+			end
+			dap.listeners.before.event_terminated.dapui_config = function()
+				dapui.close()
+			end
+			dap.listeners.before.event_exited.dapui_config = function()
+				dapui.close()
+			end
+
+			-- Keymaps
+			vim.keymap.set("n", "<F5>", dap.continue, { desc = "Debug: Start/Continue" })
+			vim.keymap.set("n", "<F10>", dap.step_over, { desc = "Debug: Step Over" })
+			vim.keymap.set("n", "<F11>", dap.step_into, { desc = "Debug: Step Into" })
+			vim.keymap.set("n", "<F12>", dap.step_out, { desc = "Debug: Step Out" })
+			vim.keymap.set("n", "<leader>db", dap.toggle_breakpoint, { desc = "Debug: Toggle Breakpoint" })
+			vim.keymap.set("n", "<leader>dB", function()
+				dap.set_breakpoint(vim.fn.input("Breakpoint condition: "))
+			end, { desc = "Debug: Conditional Breakpoint" })
+			vim.keymap.set("n", "<leader>dr", dap.repl.open, { desc = "Debug: Open REPL" })
+			vim.keymap.set("n", "<leader>du", dapui.toggle, { desc = "Debug: Toggle UI" })
+		end,
+	},
 })
